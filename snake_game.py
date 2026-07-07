@@ -1,3 +1,12 @@
+"""
+Snake Game Environment for Reinforcement Learning
+
+This module implements a Pygame-based Snake game environment designed for
+training reinforcement learning agents. It provides the game mechanics,
+state transitions, collision detection, and reward system needed for
+an AI agent to learn through interaction.
+"""
+
 import pygame
 import random
 from enum import Enum
@@ -7,11 +16,19 @@ import numpy as np
 pygame.init()
 font = pygame.font.Font('arial.ttf', 25)
 
+
 class Direction(Enum):
+    """Enumeration of possible snake movement directions.
+    
+    The four cardinal directions that the snake can move in the game.
+    These are used to track the snake's current orientation and to
+    calculate valid turns.
+    """
     RIGHT = 1
     LEFT = 2
     UP = 3
     DOWN = 4
+
 
 Point = namedtuple('Point', 'x, y')
 
@@ -26,8 +43,33 @@ BLOCK_SIZE = 20
 SPEED = 100
 
 class SnakeGameAI:
+    """Pygame-based Snake environment for AI training.
+    
+    This class implements the complete Snake game mechanics including
+    movement, collision detection, food placement, and reward calculation.
+    It's designed to interface with reinforcement learning agents by
+    providing discrete action steps and state information.
+    
+    Attributes:
+        w (int): Width of the game window in pixels (default: 640)
+        h (int): Height of the game window in pixels (default: 480)
+        display (pygame.Surface): The game display surface
+        clock (pygame.time.Clock): Clock for controlling game speed
+        direction (Direction): Current movement direction of the snake
+        head (Point): Current position of the snake's head
+        snake (list[Point]): List of Points representing snake body segments
+        score (int): Current score (number of food items eaten)
+        food (Point): Current position of the food
+        frame_iteration (int): Counter for frames elapsed in current episode
+    """
 
     def __init__(self, w=640, h=480):
+        """Initialize the Snake game environment.
+        
+        Args:
+            w (int): Width of the game window in pixels (default: 640)
+            h (int): Height of the game window in pixels (default: 480)
+        """
         #init display
         self.w = w
         self.h = h
@@ -38,6 +80,12 @@ class SnakeGameAI:
 
 
     def reset(self):
+        """Reset the game to initial state for a new episode.
+        
+        Resets the snake to starting position (center of screen, facing right),
+        initializes score to zero, places new food, and resets the frame counter.
+        This is called at the start of each training episode.
+        """
         # init default game state
         self.direction = Direction.RIGHT
 
@@ -53,6 +101,15 @@ class SnakeGameAI:
 
 
     def _place_food(self):
+        """Place food at a random location on the game grid.
+        
+        Calculates random coordinates aligned to the grid system and ensures
+        food doesn't spawn on the snake's body. Recursively calls itself
+        if the generated position conflicts with the snake.
+        
+        The grid alignment ensures food always appears at valid cell positions
+        that the snake can actually reach.
+        """
         x = random.randint(0, (self.w-BLOCK_SIZE )//BLOCK_SIZE )*BLOCK_SIZE
         y = random.randint(0, (self.h-BLOCK_SIZE )//BLOCK_SIZE )*BLOCK_SIZE
         self.food = Point(x, y)
@@ -61,6 +118,26 @@ class SnakeGameAI:
 
 
     def play_step(self, action):
+        """Execute one game step based on the provided action.
+        
+        This is the main game loop method that processes a single action from
+        the AI agent. It handles movement, collision detection, food collection,
+        and UI updates. Returns the reward, game over status, and current score.
+        
+        Args:
+            action (list): Action array representing movement choice
+                          [1,0,0] = straight, [0,1,0] = right, [0,0,1] = left
+        
+        Returns:
+            tuple: (reward, game_over, score)
+                - reward (int): +10 for food, -10 for collision, 0 otherwise
+                - game_over (bool): True if episode should end
+                - score (int): Current number of food items collected
+        
+        Note:
+            Also terminates if frame_iteration > 100 * len(snake) to prevent
+            infinite loops where the snake avoids food indefinitely.
+        """
         self.frame_iteration += 1
         # 1. handle user quitting
         for event in pygame.event.get():
@@ -96,6 +173,23 @@ class SnakeGameAI:
 
 
     def is_collision(self, pt=None):
+        """Check if a point collides with walls or the snake's body.
+        
+        Detects collision with screen boundaries or the snake's own body.
+        Used both for game over detection and for state representation
+        (checking if nearby positions are dangerous).
+        
+        Args:
+            pt (Point, optional): Point to check for collision. 
+                                 Defaults to snake head if not provided.
+        
+        Returns:
+            bool: True if collision detected, False otherwise
+        
+        Note:
+            When checking for self-collision, the head (index 0) is excluded
+            since we check against the rest of the body.
+        """
         if pt is None:
             pt = self.head
         # hits boundary
@@ -109,6 +203,15 @@ class SnakeGameAI:
 
 
     def _update_ui(self):
+        """Render the current game state to the display.
+        
+        Draws the background, snake (with visual styling), food, and current score.
+        The snake is rendered with a two-tone design (outer and inner squares)
+        for better visual appeal and depth perception.
+        
+        The UI update happens at the end of each game step after all logic
+        has been processed.
+        """
         # set background
         self.display.fill(BLACK)
         
@@ -131,6 +234,22 @@ class SnakeGameAI:
 
 
     def _move(self, action):
+        """Update snake position based on the provided action.
+        
+        Converts relative actions (straight, right, left) into absolute
+        directions by considering the current orientation. Uses a clockwise
+        direction array to calculate turns correctly regardless of current
+        direction.
+        
+        Args:
+            action (list): Action array [1,0,0] for straight, [0,1,0] for right turn,
+                          [0,0,1] for left turn
+        
+        Note:
+            This relative action system prevents the snake from making 180-degree
+            turns which would cause immediate self-collision. The agent can only
+            turn 90 degrees left or right from its current direction.
+        """
         # action space = [straight, right, left]
 
         clock_wise = [Direction.RIGHT, Direction.DOWN, Direction.LEFT, Direction.UP]
