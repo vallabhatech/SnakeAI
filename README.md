@@ -1,321 +1,246 @@
-# Snake AI
+# 🐍 Snake AI
 
-A reinforcement learning project that trains a deep Q-learning agent to play the classic Snake game using PyTorch. The agent learns to navigate the game board, collect food, and avoid collisions through experience replay and neural network-based decision making.
+A Deep Q-Learning agent that learns to play the classic Snake game using **PyTorch**, **Pygame**, and experience replay.
 
-## Features
+The project is intentionally compact: the agent observes an 11-feature representation of the game state, chooses one of three relative actions, receives a reward, and updates its neural network from experience.
 
-- **Deep Q-Learning Implementation**: Uses a neural network to learn optimal policies through Q-learning
-- **Experience Replay**: Stores and samples past experiences to improve training stability
-- **GPU Acceleration**: Automatically utilizes CUDA when available for faster training
-- **Real-time Visualization**: Live training progress with score tracking via Matplotlib
-- **Compact State Representation**: Efficient 11-feature state encoding for fast learning
-- **Self-Play Training**: Agent continuously improves through autonomous gameplay
-- **Model Persistence**: Automatically saves best-performing models
+[![Python](https://img.shields.io/badge/Python-3.7%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Pygame](https://img.shields.io/badge/Pygame-Game%20Environment-00A000)](https://www.pygame.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## Demo
+## ✨ What this project does
 
-[![Watch the Snake AI demo](thumbnail.png)](https://youtu.be/cHPOxD0hUVE)
+Snake AI trains an agent through reinforcement learning rather than hard-coded game rules.
 
-Click the image to watch the trained agent play.
+The training loop repeatedly:
 
-## How It Works
+1. Reads the current game state.
+2. Chooses an action with an epsilon-greedy policy.
+3. Executes that action in the Snake environment.
+4. Receives a reward.
+5. Learns immediately from the transition.
+6. Stores the transition in replay memory.
+7. Trains on replayed experiences after each episode.
+8. Saves the model whenever a new record score is reached.
 
-### Core Architecture
-
-The Snake AI system consists of four main components that work together:
-
-1. **Game Environment** (`snake_game.py`): Pygame-based Snake implementation
-2. **Agent** (`agent.py`): Decision-making and learning logic
-3. **Neural Network** (`model.py`): Q-network for value function approximation
-4. **Visualization** (`helper.py`): Real-time training progress tracking
-
-### AI Decision-Making Process
-
-#### 1. State Representation
-
-The agent perceives the game state through 11 binary features that capture essential information without processing the entire game board:
-
-**Danger Detection (3 features):**
-- Danger immediately straight ahead
-- Danger immediately to the right  
-- Danger immediately to the left
-
-**Current Direction (4 features):**
-- Moving left
-- Moving right
-- Moving up
-- Moving down
-
-**Food Location (4 features):**
-- Food is to the left of the head
-- Food is to the right of the head
-- Food is above the head
-- Food is below the head
-
-This compact representation allows the agent to make decisions based on immediate threats and goal direction while keeping the neural network input small and efficient.
-
-#### 2. Action Space
-
-The agent chooses from three relative movements rather than absolute directions:
+## 🧠 Architecture
 
 ```text
-[1, 0, 0] → Continue straight
-[0, 1, 0] → Turn right (relative to current direction)
-[0, 0, 1] → Turn left (relative to current direction)
+┌──────────────────────┐
+│   Snake Environment  │
+│     snake_game.py    │
+└──────────┬───────────┘
+           │ state / reward
+           ▼
+┌──────────────────────┐
+│        Agent         │
+│      agent.py        │
+│  ε-greedy + replay   │
+└──────────┬───────────┘
+           │ state
+           ▼
+┌──────────────────────┐
+│      Q-Network       │
+│       model.py       │
+│  11 → 256 → 3        │
+└──────────┬───────────┘
+           │ Q-values
+           └──────────────► action
 ```
 
-**Why relative actions?** This design prevents the agent from making illegal 180-degree turns that would cause immediate self-collision. It also allows the same learned policy to work regardless of the snake's absolute orientation, improving generalization.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deeper explanation of the data flow and learning process.
 
-#### 3. Neural Network Architecture
+## 🎯 State representation
 
-The Q-network is a simple feedforward neural network:
+The network receives **11 binary features**:
 
-```
-Input Layer (11 neurons) → Hidden Layer (256 neurons, ReLU) → Output Layer (3 neurons)
-```
+| Group | Features |
+|---|---|
+| Danger | Straight, right, left |
+| Direction | Left, right, up, down |
+| Food | Left, right, up, down |
 
-- **Input**: 11 binary state features
-- **Hidden Layer**: 256 neurons with ReLU activation for non-linear transformation
-- **Output**: 3 Q-values representing the expected future reward for each action
+This compact representation avoids feeding the entire board into the network and keeps the model lightweight.
 
-The network outputs Q-values that estimate the long-term reward potential of taking each action from the current state.
+## 🎮 Action space
 
-#### 4. Q-Learning Algorithm
+Actions are relative to the snake's current direction:
 
-The agent uses Deep Q-Learning with the following key components:
-
-**Bellman Equation for Q-Value Updates:**
-```
-Q(s,a) = r + γ * max(Q(s',a'))
-```
-Where:
-- `Q(s,a)` is the Q-value for state-action pair
-- `r` is the immediate reward
-- `γ` (gamma) is the discount factor (0.9) 
-- `max(Q(s',a'))` is the maximum Q-value for the next state
-
-**Experience Replay:**
-- Stores transitions (state, action, reward, next_state, done) in a memory buffer
-- Capacity: 100,000 transitions
-- Randomly samples batches of 1,000 transitions for training
-- Breaks correlation between consecutive experiences for more stable learning
-
-**Training Process:**
-1. **Short-term Memory**: Updates the network after each action using the immediate experience
-2. **Long-term Memory**: After each game episode, trains on a batch of sampled experiences from memory
-3. **Loss Function**: Mean Squared Error between predicted Q-values and target Q-values from Bellman equation
-
-#### 5. Exploration vs. Exploitation
-
-The agent uses an epsilon-greedy strategy to balance exploration and exploitation:
-
-```
-epsilon = 80 - number_of_games_played
+```text
+[1, 0, 0] → Straight
+[0, 1, 0] → Right
+[0, 0, 1] → Left
 ```
 
-- **Exploration**: With probability `epsilon/200`, take a random action
-- **Exploitation**: Otherwise, take the action with the highest Q-value
+Using relative actions prevents direct 180° turns and makes the policy independent of the snake's absolute orientation.
 
-As the agent plays more games, epsilon decreases, reducing random exploration and increasing reliance on learned policies.
+## 🧮 Learning setup
 
-#### 6. Reward Function
+The current implementation uses:
 
-The agent receives feedback through a sparse reward system:
+- **Algorithm:** Deep Q-Learning
+- **Network:** Fully connected neural network
+- **Architecture:** 11 inputs → 256 hidden units → 3 outputs
+- **Activation:** ReLU
+- **Optimizer:** Adam
+- **Learning rate:** 0.001
+- **Discount factor (γ):** 0.9
+- **Replay memory:** 100,000 transitions
+- **Replay batch size:** 1,000
+- **Exploration:** epsilon-greedy
+- **Reward for food:** +10
+- **Reward for collision:** -10
+- **Reward for normal movement:** 0
+- **Game grid:** 640 × 480 pixels
+- **Cell size:** 20 pixels
+- **Game speed:** 100 FPS
 
-| Event | Reward | Rationale |
-|-------|--------|-----------|
-| Eat food | `+10` | Positive reinforcement for achieving the goal |
-| Hit wall or body | `-10` | Negative reinforcement for game-ending behavior |
-| Normal movement | `0` | No immediate feedback, encourages efficiency |
+CUDA is used automatically when PyTorch detects a compatible GPU; otherwise training falls back to CPU.
 
-Additionally, games terminate if the snake goes too long without eating (100 * snake_length steps), preventing infinite loops and encouraging active food-seeking behavior.
+## 📁 Project structure
 
-### Training Loop
-
-The complete training cycle for each game:
-
-1. **Initialize**: Reset game environment, get initial state
-2. **Act**: Agent selects action based on current state (exploration or exploitation)
-3. **Execute**: Game performs action, returns reward, game status, and score
-4. **Observe**: Agent captures new state after action
-5. **Learn (Short-term)**: Update network with immediate experience
-6. **Remember**: Store transition in experience replay memory
-7. **Repeat**: Continue until game over
-8. **Learn (Long-term)**: Train network on batch of replayed experiences
-9. **Evaluate**: Update training statistics, save model if record broken
-10. **Visualize**: Update live score tracking graph
-
-## Project Structure
-
-```
+```text
 SnakeAI/
-├── agent.py              # Agent class with state encoding, action selection, and training logic
-├── model.py              # Neural network architecture and Q-learning trainer implementation
-├── snake_game.py         # Pygame environment with game mechanics and collision detection
-├── helper.py             # Matplotlib visualization for training progress tracking
+├── agent.py                 # RL agent, state encoding, replay and training loop
+├── model.py                 # Q-network and Q-learning trainer
+├── snake_game.py            # Pygame environment and game mechanics
+├── helper.py                # Training-score visualization
 ├── model/
-│   └── model.pth         # Saved neural network weights from best training session
-├── requirements.txt      # Python package dependencies
-├── README.md             # This file - comprehensive project documentation
-├── notes.txt             # Development notes and architecture overview
-├── thumbnail.png         # Demo video thumbnail
-├── arial.ttf             # Font file for game score display
-└── .vscode/
-    └── settings.json     # VSCode configuration settings
+│   └── model.pth            # Saved model weights when present
+├── docs/
+│   └── ARCHITECTURE.md      # Architecture and learning documentation
+├── .vscode/                 # Editor configuration
+├── arial.ttf                # Font used by the game UI
+├── thumbnail.png            # Demo thumbnail
+├── notes.txt                # Original development notes
+├── requirements.txt         # Python dependencies
+├── CHANGELOG.md             # Project change history
+├── CONTRIBUTING.md          # Contribution guidelines
+├── LICENSE                  # MIT license
+└── README.md                # Project documentation
 ```
 
-### File Descriptions
-
-- **agent.py**: Core reinforcement learning implementation including the Agent class that manages the training loop, experience replay, and action selection using epsilon-greedy policy
-- **model.py**: Contains Linear_QNet (the neural network) and QTrainer (handles Q-learning updates with Bellman equation implementation)
-- **snake_game.py**: Implements the SnakeGameAI class providing the game environment, state transitions, collision detection, and reward system
-- **helper.py**: Provides live plotting functionality to visualize training progress with individual and mean scores
-- **requirements.txt**: Lists all Python dependencies needed to run the project
-
-## Installation and Usage
+## 🚀 Getting started
 
 ### Prerequisites
 
-- **Python 3.7 or higher**: The project uses modern Python features and libraries
-- **GPU with CUDA support (optional)**: For accelerated training, though CPU fallback is provided
+- Python 3.7 or newer
+- pip
+- Optional: a CUDA-capable GPU with a compatible PyTorch installation
 
-### Setup Instructions
+### 1. Clone
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Jamez43/SnakeAI.git
-   cd SnakeAI
-   ```
+```bash
+git clone https://github.com/vallabhatech/SnakeAI.git
+cd SnakeAI
+```
 
-2. **Create a virtual environment (recommended):**
-   ```bash
-   python -m venv .venv
-   ```
+### 2. Create a virtual environment
 
-3. **Activate the virtual environment:**
-   
-   **On Linux/Mac:**
-   ```bash
-   source .venv/bin/activate
-   ```
-   
-   **On Windows:**
-   ```powershell
-   .venv\Scripts\activate
-   ```
+**Windows PowerShell**
 
-4. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
 
-   This will install:
-   - `torch`: PyTorch for neural network implementation
-   - `torchvision`: Additional PyTorch utilities
-   - `numpy`: Numerical computing for state representation
-   - `matplotlib`: Plotting library for training visualization
-   - `ipython`: Interactive Python utilities for live plotting
-   - `pygame`: Game engine for the Snake environment
+**Linux/macOS**
 
-### Running the Training
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
 
-Start the training process by running:
+### 3. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 4. Train the agent
 
 ```bash
 python agent.py
 ```
 
-This will:
-- Launch the Pygame window showing the agent playing Snake
-- Open a Matplotlib window displaying training progress (scores and mean scores)
-- Continuously train the agent until you close the Pygame window
-- Automatically save the best model to `model/model.pth` when a new record is achieved
+A Pygame window will display the game while Matplotlib tracks training scores.
 
-### Training Tips
+Training continues until the game window is closed.
 
-- **Initial Performance**: The agent will play randomly at first (high exploration)
-- **Learning Curve**: Typically shows improvement after 50-100 games
-- **Convergence**: Performance stabilizes as epsilon decreases (after ~80 games)
-- **GPU Usage**: If CUDA is available, training will be significantly faster
-- **Model Saving**: Best models are automatically saved when records are broken
+## 💾 Model persistence
 
-### Using a Pre-trained Model
+When the agent achieves a new record score, its network weights are saved to:
 
-To use the included pre-trained model (`model/model.pth`), you would need to modify the code to load the weights without training. The current implementation is designed for training from scratch, but the saved weights can be loaded for inference:
+```text
+model/model.pth
+```
+
+The saved file contains the PyTorch `state_dict`. To load it in another script:
 
 ```python
-agent = Agent()
-agent.model.load_state_dict(torch.load('model/model.pth'))
-agent.model.eval()  # Set to evaluation mode
+import torch
+from model import Linear_QNet
+
+model = Linear_QNet(11, 256, 3)
+model.load_state_dict(torch.load("model/model.pth", map_location="cpu"))
+model.eval()
 ```
 
-## Results and Performance
+For production or repeatable experiments, pinning dependency versions and keeping training checkpoints with experiment metadata is recommended.
 
-### Observed Performance
+## 📊 Training and evaluation
 
-- **Best Score**: Approximately 70 food items in a single game
-- **Training Time**: Several hours of continuous training for convergence
-- **Learning Rate**: Noticeable improvement after 50-100 games
+The current training program is designed primarily as a learning/demo implementation.
 
-### Limitations
+It reports:
 
-1. **State Representation**: The 11-feature state only captures immediate danger and relative food direction. It doesn't provide complete board visibility, limiting long-term planning capabilities.
+- Current game number
+- Current score
+- Best record
+- Running mean score
+- Live score visualization
 
-2. **Evaluation**: Current results are observational rather than statistically validated. No fixed-seed evaluation harness or aggregate metrics across multiple runs are included.
+The repository does **not** currently provide a statistically rigorous benchmark suite, fixed-seed evaluation harness, or experiment tracking system. Reported scores should therefore be treated as observations from training runs rather than reproducible benchmark results.
 
-3. **Local Optima**: The compact state space can lead to locally optimal behaviors that don't generalize to all game situations.
+## 🔍 Limitations
 
-4. **Memory**: While experience replay helps, the simple network architecture may not capture complex strategies that require remembering longer sequences.
+The compact state representation is useful for a small demonstration, but it has trade-offs:
 
-### Possible Improvements
+- It only describes local danger and relative food direction.
+- It does not provide the network with the complete board.
+- Long-term planning can therefore be difficult.
+- Training results can vary between runs because gameplay and food placement are randomized.
+- The current project focuses on training rather than a separate inference/evaluation application.
 
-- **Evaluation Mode**: Add a separate evaluation script to test trained models without training
-- **Statistical Validation**: Implement fixed-seed evaluation with mean, median, and variance metrics
-- **Enhanced State**: Experiment with full-grid convolutional neural networks for complete board awareness
-- **Advanced Algorithms**: Implement Double Q-Learning, Dueling networks, or Prioritized Experience Replay
-- **Hyperparameter Tuning**: Systematic exploration of learning rates, batch sizes, and network architectures
-- **Testing Suite**: Add unit tests for movement, collision detection, and reward calculation
-- **Checkpoints**: Save periodic training checkpoints for resumption and analysis
-- **Configuration Management**: Externalize hyperparameters to configuration files
+## 🛠️ Possible next steps
 
-## Technical Details
+Good directions for future development include:
 
-### Hyperparameters
+- Add a dedicated evaluation mode.
+- Add deterministic seeds and repeatable benchmark runs.
+- Move hyperparameters into a configuration file.
+- Add automated tests for game mechanics and reward calculation.
+- Add periodic checkpoints and resumable training.
+- Experiment with Double DQN or Dueling DQN.
+- Experiment with prioritized experience replay.
+- Compare compact state input against grid/CNN-based state representations.
+- Add structured experiment metrics and run summaries.
+- Add CI checks for formatting, imports, and tests.
 
-- **Learning Rate**: 0.001 (Adam optimizer)
-- **Discount Factor (γ)**: 0.9
-- **Batch Size**: 1,000 transitions
-- **Memory Capacity**: 100,000 transitions
-- **Epsilon Decay**: Linear from 80 to 0 over games
-- **Game Speed**: 100 FPS
-- **Grid Size**: 640×480 pixels with 20-pixel cells (32×24 grid)
+## 🤝 Contributing
 
-### Dependencies
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then open an issue or pull request describing the change.
 
-The project requires the following Python packages (see `requirements.txt`):
+## 📜 License
 
-```
-torch          # Deep learning framework
-torchvision    # PyTorch vision utilities
-numpy          # Numerical computing
-matplotlib     # Plotting and visualization
-ipython        # Interactive Python utilities
-pygame         # Game development library
-```
+This project is licensed under the [MIT License](LICENSE).
 
-## License
+## 🙏 Acknowledgments
 
-This project is provided as-is for educational purposes. Please refer to the original repository for specific licensing information.
+This project is an educational implementation of Deep Q-Learning applied to the classic Snake environment. It is intended as a practical way to explore reinforcement learning, neural networks, reward design, and experience replay.
 
-## Contributing
+---
 
-Contributions are welcome! Areas for improvement include:
-- Enhanced evaluation metrics
-- Additional network architectures
-- Better state representations
-- Improved visualization
-- Testing infrastructure
-
-## Acknowledgments
-
-This project demonstrates the practical application of Deep Q-Learning to a classic game environment, showcasing how reinforcement learning can be applied to sequential decision-making problems.
+**Repository:** https://github.com/vallabhatech/SnakeAI
